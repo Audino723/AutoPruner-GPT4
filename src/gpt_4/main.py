@@ -11,6 +11,8 @@ from src.gpt_4.dataset import CallGraphDataset
 from src.utils.utils import read_config_file
 from src.gpt_4.model import GPT4_Model  
 from sklearn.metrics import precision_score, recall_score, f1_score
+import pandas as pd
+import json
 
 
 warnings.filterwarnings("ignore")
@@ -21,74 +23,102 @@ TRAIN_PARAMS = {'batch_size': 15, 'shuffle': True, 'num_workers': 8}
 TEST_PARAMS = {'batch_size': 10, 'shuffle': False, 'num_workers': 8}
 
 # main.py
+import os
+import pandas as pd
+from sklearn.metrics import precision_score, recall_score, f1_score
+from tqdm import tqdm
 
-def do_test_gpt4(dataset):
+def do_test_gpt4(config, dataset):
     """
     Test GPT-4's ability to prune call graphs using the dataset.
     """
     all_outputs = []
     all_labels = []
-    precision_list, recall_list, f1_list = [], [], []
+    results = []
     estimate_cost = 0
 
     gpt4_model = GPT4_Model()
+    START_IDX = 1000
+    END_IDX =  1025
 
-    print("begin testing...")
+    print("Begin testing...")
     loop = tqdm(enumerate(dataset), leave=False, total=len(dataset))
     for idx, batch in loop:
-        if idx > 10000:
+        if idx < START_IDX:
+            continue
+
+        if idx > END_IDX:
             break
 
-        src = batch['src']
-        dst = batch['dst']
-        struct = batch['struct']
-        label = batch['label'].numpy()
+        try:
+            src = batch['src']
+            dst = batch['dst']
+            struct = batch['struct']
+            label = batch['label'].numpy()
 
-        prompt = gpt4_model.gpt4_pruning_prompt(src, dst, struct)
-        estimate_cost += gpt4_model.estimate_cost(prompt)
+            # Generate prompt and get GPT-4 output
+            gpt4_output, response = gpt4_model.forward_cot(src, dst, struct)
+            pred = gpt4_output
 
-        continue
+            print(gpt4_output)
+            print(response)
+            print(label)
 
-        # Get GPT-4's response
-        gpt4_output = gpt4_model(code, struct)
+            # Store individual outputs and labels
+            all_labels.append(label)
+            all_outputs.append(pred)
 
-        # Parse GPT-4 output into predictions (this will depend on GPT-4's response format)
-        pred = gpt4_model.parse_gpt4_output(gpt4_output)
+            # Collect detailed result for saving
+            results.append({
+                "Index": idx,
+                "Start": src,
+                "Destination": dst,
+                "Structure": struct,
+                "Label": label,
+                "Prediction": pred
+            })
 
-        # Evaluate predictions
-        precision = precision_score(label, pred, zero_division=0)
-        recall = recall_score(label, pred, zero_division=0)
-        f1 = f1_score(label, pred, zero_division=0)
+            # Update progress bar metrics
+            if all_labels and all_outputs:
+                precision = precision_score(all_labels, all_outputs, zero_division=0)
+                recall = recall_score(all_labels, all_outputs, zero_division=0)
+                f1 = f1_score(all_labels, all_outputs, zero_division=0)
+                loop.set_postfix(pre=precision, rec=recall, f1=f1, cost=gpt4_model.total_cost, total_tokens=gpt4_model.total_usage_tokens)
 
-        precision_list.append(precision)
-        recall_list.append(recall)
-        f1_list.append(f1)
+        except Exception as e:
+            print(f"Error occurred at batch {idx}: {e}")
+            continue  # Skip the current batch and move to the next
 
-        # Append results for overall metrics
-        all_outputs.extend(pred)
-        all_labels.extend(label)
+    # Save results to a CSV file
+    if results:
+        save_dir = config.get("GPT4_CACHE_DIR", "cache")
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
 
-        # Update progress bar
-        loop.set_postfix(pre=precision, rec=recall, f1=f1)
+        output_file = os.path.join(save_dir, f"gpt4_result_{START_IDX}_{END_IDX}.csv")
+        df = pd.DataFrame(results)
+        df.to_csv(output_file, index=False)
+        print(f"Results saved to {output_file}")
 
     # Compute overall metrics
-    overall_precision = np.mean(precision_list)
-    overall_recall = np.mean(recall_list)
-    overall_f1 = np.mean(f1_list)
+    overall_precision = precision_score(all_labels, all_outputs, zero_division=0) if all_labels else 0
+    overall_recall = recall_score(all_labels, all_outputs, zero_division=0) if all_labels else 0
+    overall_f1 = f1_score(all_labels, all_outputs, zero_division=0) if all_labels else 0
 
-    print(f"Estimate cost     : {estimate_cost:.2f} $")
+    print(f"Total Token Usage : {gpt4_model.total_usage_tokens}")
+    print(f"Estimate cost     : {gpt4_model.total_cost:.8f} $")
     print(f"Overall Precision : {overall_precision:.4f}")
     print(f"Overall Recall    : {overall_recall:.4f}")
     print(f"Overall F1 Score : {overall_f1:.4f}")
+
     return all_outputs, all_labels
+
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str, default="config/wala.config") 
     parser.add_argument("--mode", type=str, default="test") 
-    parser.add_argument("--model_path", type=str, default="../replication_package/model/rq1/autopruner/wala.pth", help="Path to checkpoint (for test only)") 
-    parser.add_argument("--feature", type=int, default=2, help="0: structure, 1: semantic, 2:combine")     
     return parser.parse_args()
 
 
@@ -104,7 +134,7 @@ def main():
     print("Dataset has {} test samples".format(len(test_dataset)))
 
     if mode == "test_gpt4":
-        do_test_gpt4(test_dataset)
+        do_test_gpt4(config, test_dataset)
     else:
         raise NotImplemented
 

@@ -1,0 +1,17 @@
+Begin testing...
+  0%|▎                                                                           | 1147/340624 [17:10<55:45:58,  1.69it/s, cost=0.147, f1=0.00685, pre=0.00344, rec=1, total_tokens=491199]Error occurred at batch 1147: Request timed out.
+Results saved to ../replication_package/gpt4_dataset/peta/gpt4_result_0_2500.csv
+Total Token Usage : 1067827
+Estimate cost     : 0.32034810 $
+Overall Precision : 0.0013
+Overall Recall    : 1.0000
+Overall F1 Score : 0.0026
+
+
+Begin testing...
+Results saved to ../replication_package/gpt4_dataset/wala/gpt4_result_100_200.csv
+Total Token Usage : 91923
+Estimate cost     : 0.02757690 $
+Overall Precision : 0.5867
+Overall Recall    : 0.7458
+Overall F1 Score : 0.6567
