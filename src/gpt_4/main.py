@@ -38,8 +38,8 @@ def do_test_gpt4(config, dataset):
     estimate_cost = 0
 
     gpt4_model = GPT4_Model()
-    START_IDX = 1000
-    END_IDX =  1025
+    START_IDX = 0
+    END_IDX =  10
 
     print("Begin testing...")
     loop = tqdm(enumerate(dataset), leave=False, total=len(dataset))
@@ -57,7 +57,8 @@ def do_test_gpt4(config, dataset):
             label = batch['label'].numpy()
 
             # Generate prompt and get GPT-4 output
-            gpt4_output, response = gpt4_model.forward_cot(src, dst, struct)
+            # gpt4_output, response, prompt = gpt4_model.forward(src, dst, struct)
+            gpt4_output, response, prompt = gpt4_model.forward_cot(src, dst, struct)
             pred = gpt4_output
 
             print(gpt4_output)
@@ -75,7 +76,9 @@ def do_test_gpt4(config, dataset):
                 "Destination": dst,
                 "Structure": struct,
                 "Label": label,
-                "Prediction": pred
+                "Prediction": pred,
+                "Prompt": prompt,
+                "Response": response
             })
 
             # Update progress bar metrics

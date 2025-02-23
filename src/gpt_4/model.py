@@ -25,12 +25,13 @@ header_names = [
 load_dotenv()
 
 class GPT4_Model():
-    def __init__(self, model_name="gpt-4o-mini"):
+    def __init__(self, model_name="gpt-4o"):
         # You can include any other initializations if needed
         self.model_name = model_name
         self.total_usage_tokens = 0
         self.total_cost = 0
         self.cost_per_1m_tokens = 0.3
+        self.temperature = 0.0
         
         self.client = OpenAI(            
             api_key=os.getenv('OPENAI_API_KEY'),  # This is the default and can be omitted
@@ -40,14 +41,14 @@ class GPT4_Model():
         # This is where you can process the code and structure if needed
         prompt = self.gpt4_pruning_prompt(src, dest, struct)
         gpt4_output = self.gpt4_predict(prompt)
-        return gpt4_output, None
+        return gpt4_output, None, prompt
     
     
     def forward_cot(self, src, dest, struct):
         # This is where you can process the code and structure if needed
         prompt = self.gpt4_pruning_prompt_cot(src, dest, struct)
         gpt4_output, response = self.gpt4_predict_cot(prompt)
-        return gpt4_output, response
+        return gpt4_output, response, prompt
 
 
     def gpt4_pruning_prompt(self, src, dest, struct):
@@ -68,14 +69,56 @@ Analyze the following call graph edge and decide if it should be pruned or kept 
 
 Give the answer using 1 or 0 (1: Keep/0: Prune) and no other output
     
+Caller Code:
+{dest}
+
 Callee Code:
 {src}
+
+Decision:
+1/0
+"""
+        
+        
+        prompt = f"""
+I have constructed a call graph using static analysis, and I need your help to prune irrelevant edges. For each edge, I will provide the following information:
+
+1. Caller Code: The function or block of code attempting the call.
+2. Callee Candidates: One or more possible target functions for the call.
+
+Your task is to determine whether the edge between the caller and each callee candidate should be kept or pruned. Follow these steps:
+1. Analyze the Semantic Relationship:
+   - Check if the caller and callee are logically connected based on their functionality and purpose.
+   - Prune the edge if the callee's functionality does not align with the caller’s context or intent.
+2. Utility Filtering:
+   - Identify generic or utility functions (e.g., print(), log()) that are commonly used but not central to the logic.
+   - Prune such edges unless they are directly relevant to the caller’s purpose.
+3. Dynamic Dispatch:
+   - For polymorphic or dynamic calls, analyze the caller’s context to determine which callee candidates could realistically be invoked.
+   - Keep only the valid candidates and prune the rest.
+4. Special Case - <boot> Callees:
+   - <boot> callees often represent system-generated, default, or framework-specific initialization functions.
+   - Keep <boot> callees only if:
+      - The caller logically requires initialization or bootstrapping (e.g., startup processes, default handling).
+      - The <boot> callee is critical to the execution flow. Otherwise, prune <boot> callees as irrelevant noise.
+5. Optional - Use Static Features as a Final Gate:
+    If the semantic analysis is inconclusive, use provided static features (e.g., in-degree, out-degree) to refine your decision:
+        1. Prune edges with very high in-degree if they are likely noise (e.g., utility functions).
+        2. Retain edges for nodes with low in-degree or out-degree if they seem critical to the flow (e.g., leaf nodes or controllers).
+
+**Input**:
 
 Caller Code:
 {dest}
 
-Decision:
-1/0
+Callee Code:
+{src}
+
+Structure:
+{struct_feat}
+
+Response Format:
+Give the answer using 1 or 0 (1: Keep/0: Prune) and no other output
 """
         return prompt
 
@@ -85,49 +128,84 @@ Decision:
         """
 
         # Format the tensor values into a readable string with labels
-        struct_feat = "     \n".join([f"{label}: {value}" for label, value in zip(header_names, struct)])
+        struct_feat = ",\n    ".join([f'"{label}": {value}' for label, value in zip(header_names, struct)])
         
-        
-        # Construct the refined prompt
         prompt = f"""
-Analyze the following call graph edge and decide if it should be pruned or kept based on the following criteria:
+I have constructed a call graph using static analysis, and I need your help to prune irrelevant edges. For each edge, I will provide the following information:
 
-1. Relevance: Does the callee’s function directly or indirectly contribute to the caller’s functionality?
-   - Analyze the caller's code to identify all explicit function calls and match them with the callee.
-   - Consider potential indirect calls (e.g., callbacks, dynamic dispatch, higher-order functions).
+1. Caller Code: The function or block of code attempting the call.
+2. Callee Candidates: One or more possible target functions for the call.
 
-2. Structure: Check the graph properties:
-   - `depth_from_main`, `fanout`, `in_deg`, `out_deg`
-   - Use these to determine the importance of the edge in the overall graph (e.g., prioritize edges with high `in_deg` or low `depth_from_main`).
-
-3. Exceptions: Always keep all edges where the caller contains the term `<boot>`.
-
-**Instructions**:
-1. Perform a step-by-step analysis with a maximum of 3 essential points.
-2. Use reasoning to support your decision.
-3. Provide the final decision as `1` (Keep) or `0` (Prune).
+Your task is to determine whether the edge between the caller and each callee candidate should be kept or pruned. Follow these steps:
+1. Special Case - <boot> Callees:
+   - <boot> callees often represent system-generated, default, or framework-specific initialization functions. Keep it.
+2. Analyze the Semantic Relationship:
+   - Check if the caller and callee are logically connected based on their functionality and purpose.
+   - Prune the edge if the callee's functionality does not align with the caller’s context or intent.
+3. Utility Filtering:
+   - Identify generic or utility functions (e.g., print(), log()) that are commonly used but not central to the logic.
+   - Prune such edges unless they are directly relevant to the caller’s purpose.
+4. Dynamic Dispatch:
+   - For polymorphic or dynamic calls, analyze the caller’s context to determine which callee candidates could realistically be invoked.
+   - Keep only the valid candidates and prune the rest. 
+5. Analyze the Directionality:
+   - Identify which code block is the caller and which is the callee by verifying their parent function names.
+   - Validate whether the caller explicitly calls the callee. The edge should only be kept if the caller directly invokes the callee within its logic.
+   - If the callee invokes the caller or the relationship is undefined, prune the edge.
+6. Analyze Static Features:
+    If the semantic analysis is inconclusive, use provided static features (e.g., in-degree, out-degree) to refine your decision:
+        1. Prune edges with very high in-degree if they are likely noise (e.g., utility functions).
+        2. Retain edges for nodes with low in-degree or out-degree if they seem critical to the flow (e.g., leaf nodes or controllers).
 
 **Input**:
-Callee Code:
-{src}
 
-Caller Code:
+**Caller Code**:
+```java
 {dest}
+```
 
-Structure:
+**Callee Code**:
+```java
+{src}
+```
+
+**Structure**:
+```json
 {struct_feat}
+```
 
-**Reasoning**:
-Step 1: Identify function calls in the caller and check for direct invocation of the callee.
-Step 2: Analyze indirect invocation patterns (if no direct calls are found).
-Step 3: Evaluate the structural properties and check for exceptions (`<boot>`).
+Response Format:
+Provide the final decision as `1` (Keep) or `0` (Prune).
+"""
+        
+        
+        prompt = f"""
+Given an edge from a call-graph constructed by a WALA static analysis, determine wether its a true positive or a false positive.    
 
----
+**Input**:
 
-**END OF RESPONSE**
+**Caller Code**:
+```java
+{dest}
+```
 
-**Decision**:
-1/0
+**Callee Code**:
+```java
+{src}
+```
+
+**Structure**:
+```json
+{struct_feat}
+```
+
+Response Format:
+Give your explanation in one sentence.
+Provide the final decision as `1` (TP) or `0` (FP).
+"""
+
+        prompt = """
+ewr
 """
         
         return prompt
@@ -143,7 +221,7 @@ Step 3: Evaluate the structural properties and check for exceptions (`<boot>`).
                 # {"role": "system", "content": "You are a 10x developer that understand coding deeply."},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.0,
+            temperature=self.temperature,
         )
 
 
@@ -163,7 +241,7 @@ Step 3: Evaluate the structural properties and check for exceptions (`<boot>`).
                 # {"role": "system", "content": "You are a 10x developer that understand coding deeply."},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.0,
+            temperature=self.temperature,
             response_format={
             "type": "json_schema",
             "json_schema": {

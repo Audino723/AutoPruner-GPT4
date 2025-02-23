@@ -44,14 +44,17 @@ def get_input_and_mask(src, dst , max_length, tokenizer):
         raise "Truncation errors"
     return tokens_ids, mask
 
-def load_code(path):
+def load_code(path, new_line=False):
     data = {}
     df = pd.read_csv(path)
     descriptor = df['descriptor']
     code = df['code']
     for i in range(len(descriptor)):
         if isinstance(code[i], str):
-            data[descriptor[i]] = " ".join(code[i].replace("\n", " ").split())
+            if new_line:
+                data[descriptor[i]] = code[i]
+            else:
+                data[descriptor[i]] = " ".join(code[i].replace("\n", " ").split())
     return data
 
 

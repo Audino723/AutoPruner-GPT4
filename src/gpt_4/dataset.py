@@ -59,6 +59,7 @@ class CallGraphDataset(Dataset):
             'dst': self.data[index][1],  # Raw destination (target) name
             'struct': torch.tensor(struct_feats, dtype=torch.float),  # Static features (in/out degrees, etc.)
             'label': torch.tensor(self.labels[index], dtype=torch.long),  # Label
+            'static_ids': self.static_ids[index],
         }
 
     def process(self):
@@ -68,7 +69,7 @@ class CallGraphDataset(Dataset):
         self.static_ids = []
 
         with open(self.program_lists, "r") as f:
-            for line in f:
+            for line in tqdm(f):
                 filename = line.strip()
                 file_path = os.path.join(self.raw_data_path, filename, self.cg_file)
                 df = pd.read_csv(file_path)
@@ -77,7 +78,7 @@ class CallGraphDataset(Dataset):
                 for i in tqdm(range(len(df['wiretap']))):
                     src, dst, lb, sanity_check = df['method'][i], df['target'][i], df['wiretap'][i], df[self.config["SA_LABEL"]][i]
                     
-                    descriptor2code = load_code(os.path.join(self.processed_path, filename, 'code.csv'))
+                    descriptor2code = load_code(os.path.join(self.processed_path, filename, 'code.csv'), new_line=True)
                     if src != '<boot>':
                         if src in descriptor2code:
                             src = descriptor2code[src]
