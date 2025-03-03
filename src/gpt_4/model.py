@@ -25,7 +25,7 @@ header_names = [
 load_dotenv()
 
 class GPT4_Model():
-    def __init__(self, model_name="gpt-4o"):
+    def __init__(self, model_name="gpt-4o-mini"):
         # You can include any other initializations if needed
         self.model_name = model_name
         self.total_usage_tokens = 0
@@ -37,21 +37,21 @@ class GPT4_Model():
             api_key=os.getenv('OPENAI_API_KEY'),  # This is the default and can be omitted
         )
 
-    def forward(self, src, dest, struct):
+    def forward(self, src, src_descriptor, dst, dst_descriptor, struct):
         # This is where you can process the code and structure if needed
-        prompt = self.gpt4_pruning_prompt(src, dest, struct)
+        prompt = self.gpt4_pruning_prompt(src, src_descriptor, dst, dst_descriptor, struct)
         gpt4_output = self.gpt4_predict(prompt)
         return gpt4_output, None, prompt
     
     
-    def forward_cot(self, src, dest, struct):
+    def forward_cot(self, src, src_descriptor, dst, dst_descriptor, struct):
         # This is where you can process the code and structure if needed
-        prompt = self.gpt4_pruning_prompt_cot(src, dest, struct)
+        prompt = self.gpt4_pruning_prompt_cot(src, src_descriptor, dst, dst_descriptor, struct)
         gpt4_output, response = self.gpt4_predict_cot(prompt)
         return gpt4_output, response, prompt
 
 
-    def gpt4_pruning_prompt(self, src, dest, struct):
+    def gpt4_pruning_prompt(self, src, src_descriptor, dst, dst_descriptor, struct):
         """
         Create a prompt for GPT-4 to perform call graph pruning.
         """
@@ -70,7 +70,7 @@ Analyze the following call graph edge and decide if it should be pruned or kept 
 Give the answer using 1 or 0 (1: Keep/0: Prune) and no other output
     
 Caller Code:
-{dest}
+{dst}
 
 Callee Code:
 {src}
@@ -109,7 +109,7 @@ Your task is to determine whether the edge between the caller and each callee ca
 **Input**:
 
 Caller Code:
-{dest}
+{dst}
 
 Callee Code:
 {src}
@@ -120,9 +120,37 @@ Structure:
 Response Format:
 Give the answer using 1 or 0 (1: Keep/0: Prune) and no other output
 """
+        
+        
+        
+        prompt = f"""
+Given an edge from a call-graph constructed by a WALA static analysis, determine wether its a true positive or a false positive.    
+
+**Input**:
+
+**Callee Code**:
+{dst_descriptor}
+```java
+{dst}
+```
+
+**Caller Code**:
+{src_descriptor}
+```java
+{src}
+```
+
+**Structure**:
+```json
+{struct_feat}
+```
+
+Response Format:
+Give the answer using 1 or 0 (1: Keep/0: Prune) and no other output
+"""
         return prompt
 
-    def gpt4_pruning_prompt_cot(self, src, dest, struct):
+    def gpt4_pruning_prompt_cot(self, src, src_descriptor, dst, dst_descriptor, struct):
         """
         Create a prompt for GPT-4 to perform call graph pruning.
         """
@@ -161,7 +189,7 @@ Your task is to determine whether the edge between the caller and each callee ca
 
 **Caller Code**:
 ```java
-{dest}
+{dst}
 ```
 
 **Callee Code**:
@@ -184,12 +212,14 @@ Given an edge from a call-graph constructed by a WALA static analysis, determine
 
 **Input**:
 
-**Caller Code**:
+**Callee Code**:
+{dst_descriptor}
 ```java
-{dest}
+{dst}
 ```
 
-**Callee Code**:
+**Caller Code**:
+{src_descriptor}
 ```java
 {src}
 ```
@@ -200,13 +230,12 @@ Given an edge from a call-graph constructed by a WALA static analysis, determine
 ```
 
 Response Format:
-Give your explanation in one sentence.
 Provide the final decision as `1` (TP) or `0` (FP).
 """
 
-        prompt = """
-ewr
-"""
+#         prompt = """
+# ewr
+# """
         
         return prompt
 

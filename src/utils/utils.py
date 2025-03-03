@@ -55,6 +55,7 @@ def load_code(path, new_line=False):
                 data[descriptor[i]] = code[i]
             else:
                 data[descriptor[i]] = " ".join(code[i].replace("\n", " ").split())
+                
     return data
 
 

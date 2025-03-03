@@ -1,12 +1,21 @@
-Begin testing...
-  0%|▎                                                                           | 1147/340624 [17:10<55:45:58,  1.69it/s, cost=0.147, f1=0.00685, pre=0.00344, rec=1, total_tokens=491199]Error occurred at batch 1147: Request timed out.
+Without CoT, LLM output final answer only
+
 Results saved to ../replication_package/gpt4_dataset/peta/gpt4_result_0_2500.csv
 Total Token Usage : 1067827
 Estimate cost     : 0.32034810 $
 Overall Precision : 0.0013
 Overall Recall    : 1.0000
 Overall F1 Score : 0.0026
+duration : ~30mins / 1.4it/s
 
+
+Results saved to ../replication_package/gpt4_dataset/wala/gpt4_result_0_2500.csv
+Total Token Usage : 1067827
+Estimate cost     : 0.32034810 $
+Overall Precision : 0.3662
+Overall Recall    : 0.6777
+Overall F1 Score : 0.2509
+duration : ~30mins / 1.4it/s
 
 Begin testing...
 Results saved to ../replication_package/gpt4_dataset/wala/gpt4_result_100_200.csv
@@ -15,3 +24,32 @@ Estimate cost     : 0.02757690 $
 Overall Precision : 0.5867
 Overall Recall    : 0.7458
 Overall F1 Score : 0.6567
+duration : ~30mins / 1.4it/s
+
+
+With CoT, LLM output reasonings + final answer
+
+Results saved to ../replication_package/gpt4_dataset/wala/gpt4_result_0_2500.csv
+Total Token Usage : 3762152
+Estimate cost     : 1.12864560 $
+Overall Precision : 0.4690
+Overall Recall    : 0.3617
+Overall F1 Score : 0.4085
+
+========================================================================
+
+no cot + fixed caller and callee
+
+Results saved to ../replication_package/gpt4_dataset/wala/gpt4_result_0_1000.csv
+Total Token Usage : 1387667
+Estimate cost     : 0.41630010 $
+Overall Precision : 0.6072
+Overall Recall    : 0.8246
+Overall F1 Score : 0.6994
+
+Results saved to ../replication_package/gpt4_dataset/wala/gpt4_result_0_1000.csv
+Total Token Usage : 1725726
+Estimate cost     : 0.51771780 $
+Overall Precision : 0.5223
+Overall Recall    : 0.8211
+Overall F1 Score : 0.6385

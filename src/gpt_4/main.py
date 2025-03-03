@@ -39,7 +39,7 @@ def do_test_gpt4(config, dataset):
 
     gpt4_model = GPT4_Model()
     START_IDX = 0
-    END_IDX =  10
+    END_IDX =  1000
 
     print("Begin testing...")
     loop = tqdm(enumerate(dataset), leave=False, total=len(dataset))
@@ -51,34 +51,37 @@ def do_test_gpt4(config, dataset):
             break
 
         try:
-            src = batch['src']
-            dst = batch['dst']
+            src, src_descriptor = batch['src'], batch['descriptor_src']
+            dst, dst_descriptor = batch['dst'], batch['descriptor_dst']
             struct = batch['struct']
             label = batch['label'].numpy()
 
-            # Generate prompt and get GPT-4 output
-            # gpt4_output, response, prompt = gpt4_model.forward(src, dst, struct)
-            gpt4_output, response, prompt = gpt4_model.forward_cot(src, dst, struct)
-            pred = gpt4_output
 
+            # Generate prompt and get GPT-4 output
+            # final_answer, gpt4_output, prompt = gpt4_model.forward(src, src_descriptor, dst, dst_descriptor, struct)
+            final_answer, gpt4_output, prompt = gpt4_model.forward_cot(src, src_descriptor, dst, dst_descriptor, struct)
+            pred = final_answer
+
+            print()
+            # print(prompt)
             print(gpt4_output)
-            print(response)
-            print(label)
+            print(final_answer, label)
+            print()
 
             # Store individual outputs and labels
             all_labels.append(label)
-            all_outputs.append(pred)
+            all_outputs.append(final_answer)
 
             # Collect detailed result for saving
             results.append({
-                "Index": idx,
-                "Start": src,
-                "Destination": dst,
-                "Structure": struct,
-                "Label": label,
-                "Prediction": pred,
-                "Prompt": prompt,
-                "Response": response
+                "index": idx,
+                "start": src,
+                "destination": dst,
+                "structure": struct,
+                "label": label,
+                "prediction": pred,
+                "prompt": prompt,
+                "gpt4_output": gpt4_output
             })
 
             # Update progress bar metrics

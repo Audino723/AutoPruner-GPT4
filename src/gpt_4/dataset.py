@@ -60,6 +60,8 @@ class CallGraphDataset(Dataset):
             'struct': torch.tensor(struct_feats, dtype=torch.float),  # Static features (in/out degrees, etc.)
             'label': torch.tensor(self.labels[index], dtype=torch.long),  # Label
             'static_ids': self.static_ids[index],
+            'descriptor_src': self.descriptors[index][0],
+            'descriptor_dst': self.descriptors[index][1]
         }
 
     def process(self):
@@ -67,6 +69,7 @@ class CallGraphDataset(Dataset):
         self.struct_feats = []
         self.labels = []
         self.static_ids = []
+        self.descriptors = []
 
         with open(self.program_lists, "r") as f:
             for line in tqdm(f):
@@ -79,14 +82,19 @@ class CallGraphDataset(Dataset):
                     src, dst, lb, sanity_check = df['method'][i], df['target'][i], df['wiretap'][i], df[self.config["SA_LABEL"]][i]
                     
                     descriptor2code = load_code(os.path.join(self.processed_path, filename, 'code.csv'), new_line=True)
+
+
                     if src != '<boot>':
+                        src_descriptor = convert(src)
                         if src in descriptor2code:
                             src = descriptor2code[src]
                         else:
-                            src = convert(src).__tocode__()
+                            src = src_descriptor.__tocode__()
+                    else:
+                        src_descriptor = src
                     
                     dst_descriptor = convert(dst)
-                    
+
                     if dst in descriptor2code:
                         dst = descriptor2code[dst]
                     else:
@@ -97,6 +105,7 @@ class CallGraphDataset(Dataset):
                     self.struct_feats.append(features[i])
                     self.labels.append(lb)
                     self.static_ids.append(sanity_check)
+                    self.descriptors.append([src_descriptor.__repr__(), dst_descriptor.__repr__()])
 
 
     def save(self):
@@ -107,7 +116,8 @@ class CallGraphDataset(Dataset):
             'data': self.data,
             'struct_feats': self.struct_feats,
             'labels': self.labels,
-            'static_ids': self.static_ids
+            'static_ids': self.static_ids,
+            'descriptors': self.descriptors,
         })
 
     def load(self):
@@ -117,6 +127,7 @@ class CallGraphDataset(Dataset):
         self.struct_feats = info_dict['struct_feats']
         self.labels = info_dict['labels']
         self.static_ids = info_dict['static_ids']
+        self.descriptors = info_dict['descriptors']
 
     def has_cache(self):
         if os.path.exists(self.save_path):

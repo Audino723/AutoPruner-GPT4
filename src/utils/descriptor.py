@@ -12,7 +12,7 @@ class Descriptor:
 
     def __repr__(self):
         return "Path: {}, class name: {},  Function name: {}, params: {}, return_type: {}".format(self.source_path, self.class_name, self.function_name, self.params, self.return_type)
-
+    
     def __eq__(self, other):
         if not isinstance(other, Descriptor):
             return NotImplemented
